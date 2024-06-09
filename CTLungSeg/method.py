@@ -41,11 +41,51 @@ def adaptive_histogram_equalization(image, radius):
     filter.SetRadius(radius)
     return filter.Execute(image)
 
+
 def median_filter(image, radius):
-    pass
+    """中值滤波,去除椒盐噪音"""
+    if radius <= 0:
+        raise ValueError('radius must be greater or equal than 1')
+    filter = sitk.MedianImageFilter()
+    filter.SetRadius(int(radius))
+    return filter.Execute(image)
+
 
 def std_filter(image, radius):
-    pass
+    """标准差滤波,平滑图像"""
+    if radius <= 0:
+        raise ValueError('radius must be greater or equal than 1')
+    filter = sitk.NoiseImageFilter()
+    filter.SetRadius(int(radius))
+    return filter.Execute(image)
 
-def gamma_correction(image, gamma, image_type='HU'):
-    pass
+
+def cast_image(image, target_type):
+    """图像类型转换"""
+    filter = sitk.CastImageFilter()
+    filter.SetOutputPixelType(target_type)
+    return filter.Execute(image)
+
+
+def gamma_correction(image, gamma=1.0, image_type='HU'):
+    """伽马校正"""
+    bounding_values = {'uint8': [0, 255],
+                       'uint16': [0, 2 ** 16],
+                       'HU': [0, 2 ** 12]
+                       }
+    image_types = {'uint8': sitk.sitkUInt8,
+                   'uint16': sitk.sitkUInt16,
+                   'HU': sitk.sitkUInt16}
+    if gamma == 0:
+        raise Exception('gamma value cannot be zero')
+    if image_type not in ['uint8', 'uint16', 'HU']:
+        raise Exception(f'image type {image_type} is not supported')
+
+    image = cast_image(image, sitk.sitkFloat32)
+    power_filter = sitk.PowImageFilter()
+    inverse_gamma = 1.0 / gamma
+    output = power_filter.Execute(image, inverse_gamma)
+    cur_bound = bounding_values[image_type]
+    out = sitk.Threshold(image1=output, lower=cur_bound[0], upper=cur_bound[1], outsideValue=cur_bound[1])
+    out = sitk.Cast(out, image_types[image_type])
+    return out
